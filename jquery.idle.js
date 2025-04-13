@@ -31,10 +31,13 @@
   'use strict';
 
   $.fn.idle = function (options) {
-    var defaults = {
+    let defaults = {
         idle: 60000, //idle time in ms
+          preIdle: 30000,
         events: 'mousemove keydown mousedown touchstart', //events that will trigger the idle resetter
         onIdle: function () {}, //callback function to be executed after idle time
+          onPreIdle: function () {
+          }, //callback function to be executed on specific preidle time
         onActive: function () {}, //callback function to be executed after back from idleness
         onHide: function () {}, //callback function to be executed when window is hidden
         onShow: function () {}, //callback function to be executed when window is visible
@@ -43,43 +46,59 @@
         recurIdleCall: false
       },
       idle = options.startAtIdle || false,
+        preIdle = false,
       visible = !options.startAtIdle || true,
       settings = $.extend({}, defaults, options),
       lastId = null,
+        lastPreId = null,
       resetTimeout,
-      timeout;
+        timeout,
+        preIdleTimer;
 
     //event to clear all idle events
     $(this).on( "idle:stop", {}, function( event) {
       $(this).off(settings.events);
       settings.keepTracking = false;
-      resetTimeout(lastId, settings);
+      resetTimeout(lastId, lastPreId, settings);
     });
 
-    resetTimeout = function (id, settings) {
-      if (idle) {
-        idle = false;
+    resetTimeout = function (id, preId, settings) {
+      if (idle || preId) {
+        idle = preIdle = false;
         settings.onActive.call();
       }
       clearTimeout(id);
+      clearTimeout(preId);
       if(settings.keepTracking) {
+        lastPreId = preIdleTimer(settings);
         return timeout(settings);
       }
     };
 
     timeout = function (settings) {
-      var timer = (settings.recurIdleCall ? setInterval : setTimeout), id;
+      let timer = (settings.recurIdleCall ? setInterval : setTimeout), id;
       id = timer(function () {
         idle = true;
-        settings.onIdle.call();
+        settings.onIdle.call(this, settings.idle);
       }, settings.idle);
+      return id;
+    };
+
+    preIdleTimer = function (settings) {
+      let timer = (settings.recurIdleCall ? setInterval : setTimeout), id;
+      id = timer(function () {
+        preIdle = true;
+        settings.onPreIdle.call(this, settings.preIdle, settings.idle);
+        // clearTimeout(id);
+      }, settings.preIdle);
       return id;
     };
 
     return this.each(function () {
       lastId = timeout(settings);
+      lastPreId = preIdleTimer(settings);
       $(this).on(settings.events, function (e) {
-        lastId = resetTimeout(lastId, settings);
+        lastId = resetTimeout(lastId, lastPreId, settings);
       });
       if (settings.onShow || settings.onHide) {
         $(document).on("visibilitychange webkitvisibilitychange mozvisibilitychange msvisibilitychange", function () {

@@ -11,10 +11,13 @@
   'use strict';
 
   window.idle = function (options){
-    var defaults = {
+    let defaults = {
       idle: 60000, // idle time in ms
+      preIdle: 30000,
       events: ['mousemove', 'keydown', 'mousedown', 'touchstart'], // events that will trigger the idle resetter
       onIdle: function (){}, // callback function to be executed after idle time
+      onPreIdle: function () {
+      }, //callback function to be executed on specific preidle time
       onActive: function (){}, // callback function to be executed after back form idleness
       onHide: function (){}, // callback function to be executed when window become hidden
       onShow: function (){}, // callback function to be executed when window become visible
@@ -22,34 +25,38 @@
       startAtIdle: false, // set it to true if you want to start in the idle state
       recurIdleCall: false
     };
-    var settings = extend({}, defaults, options);
-    var idle = settings.startAtIdle;
-    var visible = !settings.startAtIdle;
-    var visibilityEvents = ['visibilitychange', 'webkitvisibilitychange', 'mozvisibilitychange', 'msvisibilitychange'];
-    var lastId = null;
-    var resetTimeout, timeout;
+    let settings = extend({}, defaults, options);
+    let idle = settings.startAtIdle;
+    let preIdle = false;
+    let visible = !settings.startAtIdle;
+    let visibilityEvents = ['visibilitychange', 'webkitvisibilitychange', 'mozvisibilitychange', 'msvisibilitychange'];
+    let lastId = null;
+    let resetTimeout, timeout, preIdleTimer;
+    let lastPreId = null;
 
     // event to clear all idle events
     window.addEventListener('idle:stop', function (event){
       bulkRemoveEventListener(window, settings.events);
       settings.keepTracking = false;
-      resetTimeout(lastId, settings);
+      resetTimeout(lastId, lastPreId, settings);
     });
 
-    var resetTimeout = function resetTimeout (id, settings){
-      if(idle){
-        idle = false;
+    resetTimeout = function resetTimeout(id, preId, settings) {
+      if (idle || preId) {
+        idle = preIdle = false;
         settings.onActive.call();
       }
       clearTimeout(id);
+      clearTimeout(preId);
       if(settings.keepTracking){
+        lastPreId = preIdleTimer(settings);
         return timeout(settings);
       }
     };
 
-    var timeout = function timeout (settings){
-      var timer = (settings.recurIdleCall) ? setInterval : setTimeout;
-      var id;
+    timeout = function timeout(settings) {
+      let timer = (settings.recurIdleCall) ? setInterval : setTimeout;
+      let id;
       id = timer(function (){
         idle = true;
         settings.onIdle.call();
@@ -57,11 +64,22 @@
       return id;
     };
 
+    preIdleTimer = function pretimeout(settings) {
+      let timer = (settings.recurIdleCall) ? setInterval : setTimeout;
+      let id;
+      id = timer(function () {
+        preIdle = true;
+        settings.onPreIdle.call(this, settings.preIdle, settings.idle);
+      }, settings.idle);
+      return id;
+    };
+
     return {
       start: function (){
         lastId = timeout(settings);
+        lastPreId = preIdleTimer(settings);
         bulkAddEventListener(window, settings.events, function (event){
-          lastId = resetTimeout(lastId, settings);
+          lastId = resetTimeout(lastId, lastPreId, settings);
         });
         if(settings.onShow || settings.onHide){
           bulkAddEventListener(document, visibilityEvents, function (event){
@@ -82,7 +100,7 @@
     }
   };
 
-  var bulkAddEventListener = function bulkAddEventListener (object, events, callback){
+  let bulkAddEventListener = function bulkAddEventListener(object, events, callback) {
     events.forEach(function (event){
       object.addEventListener(event, function (event){
         callback(event);
@@ -90,20 +108,20 @@
     });
   };
 
-  var bulkRemoveEventListener = function bulkRemoveEventListener (object, events){
+  let bulkRemoveEventListener = function bulkRemoveEventListener(object, events) {
     events.forEach(function (event){
       object.removeEventListener(event);
     });
   };
 
   // Thanks to http://youmightnotneedjquery.com/
-  var extend = function extend (out){
+  let extend = function extend(out) {
     out = out || {};
-    for (var i = 1; i < arguments.length; i++) {
+    for (let i = 1; i < arguments.length; i++) {
       if (!arguments[i]){
         continue;
       }
-      for (var key in arguments[i]) {
+      for (let key in arguments[i]) {
         if (arguments[i].hasOwnProperty(key)){
           out[key] = arguments[i][key];
         }
