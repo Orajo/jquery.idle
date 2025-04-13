@@ -24,7 +24,11 @@ $(document).idle({
 })
 ```
 
-That will display a alert (and a great revelation :D) to the user after 10 seconds of idleness.
+That will display an alert (and a great revelation :D) to the user after 10 seconds of idleness.
+
+Sometimes, you might want to perform an something, before idle times exceeded, e.g. show some warning. You can do it
+using `onPreIdle` handler. A typical use case is to log out the user after idle time, but also show some notification a
+few minutes before.
 
 If you want to call some function after user back from idleness, just add the onActive option:
 
@@ -33,10 +37,14 @@ $(document).idle({
   onIdle: function(){
     alert('I\'m idle');
   },
+  onPreIdle: function(){
+    console.log('Maybe you shoud do something?');
+  },
   onActive: function(){
     alert('Hey, I\'m back!');
   },
-  idle: 10000
+  idle: 10000,
+  preIdle: 6000
 })
 ```
 
@@ -93,11 +101,13 @@ $(document).idle({
 
 ```
 onIdle        # callback function that will be triggered when the user gets idle
+onPreIdle     # callback function to be executed on specific preidle time
 onActive      [ default function(){} ] # callback function that will be triggered when the user gets active
 onHide        [ default function(){} ] # callback function that will be triggered when window is hidden
 onShow        [ default function(){} ] # callback function that will be triggered when window is visible
 events        [ default = mousemove keydown mousedown touchstart ] # events that will reset the idle time
 idle          [ default = 60000 ] # idle time in ms
+preIdle       [ default = 30000 ] # pre-idle time in ms
 keepTracking  [ default = true ] # set it to false if you want to track only the first time
 startAtIdle   [ default = false ] # if you want to start idle, set it to true
 recurIdleCall [ default = false ] # by default use setTimeout, set it to true if you want to use setInterval
